@@ -53,3 +53,17 @@ func concludeObjectType(gid string) (reflect.Type, error) {
 		return reflect.TypeOf(nil), fmt.Errorf("`%s` not implemented type", resource)
 	}
 }
+
+func detectEndpointType(typename string) (reflect.Type, error) {
+	fmt.Println("== typename", typename)
+	switch typename {
+	case "WebhookHttpEndpoint", "WebhookSubscription":
+		return reflect.TypeOf(WebhookHTTPEndpoint{}), nil
+	case "WebhookPubSubEndpoint":
+		return reflect.TypeOf(WebhookPubSubEndpoint{}), nil
+	case "WebhookEventBridgeEndpoint":
+		return reflect.TypeOf(WebhookEventBridgeEndpoint{}), nil
+	default:
+		return nil, fmt.Errorf("endpoint type `%s` not implemented", typename)
+	}
+}
