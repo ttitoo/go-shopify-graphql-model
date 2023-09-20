@@ -49,39 +49,45 @@ func (c *WebhookSubscriptionConnection) UnmarshalJSON(b []byte) error {
 
 func decodeWebhookSubscription(m map[string]interface{}) (*WebhookSubscription, error) {
 	node := WebhookSubscription{}
-	endpointData := m["endpoint"].(map[string]interface{})
-	delete(m, "endpoint")
+	var endpointData map[string]interface{}
+	if _, ok := endpointData["endpoint"].(map[string]interface{}); ok {
+		endpointData = m["endpoint"].(map[string]interface{})
+		delete(m, "endpoint")
+	}
 
 	err := mapstructure.Decode(m, &node)
 	if err != nil {
 		return nil, fmt.Errorf("decode webhook subscription node: %w", err)
 	}
 
-	var typename string
-	if val, ok := endpointData["__typename"].(string); ok {
-		typename = val
-	} else if val, ok := m["id"].(string); ok {
-		submatches := gidRegex.FindStringSubmatch(val)
-		if len(submatches) != 2 {
-			return nil, fmt.Errorf("malformed gid=`%s`", val)
+	if len(endpointData) > 0 {
+		var typename string
+		if val, ok := endpointData["__typename"].(string); ok {
+			typename = val
+		} else if val, ok := m["id"].(string); ok {
+			submatches := gidRegex.FindStringSubmatch(val)
+			if len(submatches) != 2 {
+				return nil, fmt.Errorf("malformed gid=`%s`", val)
+			}
+			typename = submatches[1]
+		} else {
+			return nil, fmt.Errorf("can not detect WebhookSubscriptionEndpoint")
 		}
-		typename = submatches[1]
-	} else {
-		return nil, fmt.Errorf("can not detect WebhookSubscriptionEndpoint")
+
+		t, err := detectEndpointType(typename)
+		if err != nil {
+			return nil, err
+		}
+
+		endpoint := reflect.New(t).Interface()
+		err = mapstructure.Decode(endpointData, &endpoint)
+		if err != nil {
+			return nil, fmt.Errorf("decode webhook subscription endpoint node: %w", err)
+		}
+
+		node.Endpoint = endpoint.(WebhookSubscriptionEndpoint)
 	}
 
-	t, err := detectEndpointType(typename)
-	if err != nil {
-		return nil, err
-	}
-
-	endpoint := reflect.New(t).Interface()
-	err = mapstructure.Decode(endpointData, &endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("decode webhook subscription endpoint node: %w", err)
-	}
-
-	node.Endpoint = endpoint.(WebhookSubscriptionEndpoint)
 	return &node, nil
 }
 
